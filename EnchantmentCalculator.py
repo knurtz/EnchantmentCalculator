@@ -6,7 +6,7 @@ from anytree import Node, NodeMixin, RenderTree, DoubleStyle
 import itertools
 from random import randint
 
-"""
+
 class Enchantment:
 	identifier = -1			# Default = -1, Sweeping Edge = 37
 	name = "Default"
@@ -15,16 +15,26 @@ class Enchantment:
 	book_multiplier = 0
 	
 	
-class Item(NodeMixin):
-	def __init__(self, name, parent = None, children = None):
-		self.item_type = "book"			# can be book or item. todo: differentiate between all different types of items to check enchantment compatibility
-		self.prior_work_penalty = 0
-		self.enchantments = []
+class Item(Node):
+	def __init__(self, name, parent = None, children = None, item_type = "book", cost = 0, enchantments = []):
+		self.item_type = item_type			# can be book or item. todo: differentiate between all different types of items to check enchantment compatibility
+		self.cost = cost
+		self.enchantments = enchantments
 		self.name = name
 		self.parent = parent
 		if children:
 			self.children = children
-"""
+	
+	def updateCost(self):
+		# leaves can't update their cost, it is fixed
+		if self.is_leaf: return
+		
+		# recursively update costs of all child nodes and add to own cost
+		self.cost = 0
+		for n in self.children:
+			n.updateCost()
+			self.cost = self.cost + n.cost
+
 
 def total_items(level):
 	res = 1
@@ -50,12 +60,12 @@ total_combinations = tree_layouts * combinations_per_tree
 #print("Total items: %i \nFull rows: %i \nAdditional leave pairs: %i \nPossible Positions for additional pairs: %i \nDifferent tree layouts: %i \nCombinations per tree: %i \nTotal combinations: %i" % (total_inputs, full_rows, additional_leave_pairs, possible_positions, tree_layouts, combinations_per_tree, total_combinations))
 
 all_items = []
-base_tree = Node("", x = 0)
+base_tree = Item("", cost = 0)
 # add two children to every leave until number of leaves matches possible_positions
 while len(base_tree.leaves) < possible_positions:
 	for n in base_tree.leaves:
-		Node("Target", parent = n, x = 0)
-		Node("Sacrifice", parent = n, x = 0)
+		Item("Target", parent = n, cost = 0)
+		Item("Sacrifice", parent = n, cost = 0)
 
 base_tree.name = "Final item"
 
@@ -75,19 +85,21 @@ else:
 		
 		# add an additional leave pair at each position
 		for index in p:
-			Node("Target", parent=base_tree_leaves[index], x = 0)
-			Node("Sacrifice", parent=base_tree_leaves[index], x = 0)
+			Item("Target", parent=base_tree_leaves[index], cost = 0)
+			Item("Sacrifice", parent=base_tree_leaves[index], cost = 0)
 			
 		# tree is now ready
 		
 		# temp: add random prices to each leave
 		for l in base_tree.leaves:
-			l.x = randint(1,9)
+			l.cost = randint(1,9)
 			
 		# recalculate all costs of parents
+		base_tree.updateCost()
 			
-		print(RenderTree(base_tree, style = DoubleStyle).by_attr(lambda n: n.name + ", Cost: " + str(n.x)))
+		print(RenderTree(base_tree, style = DoubleStyle).by_attr(lambda n: n.name + ", Cost: " + str(n.cost)))
 		print("===================")
+		print()
 		
 		# return to base tree for next iteration
 		for n in base_tree_leaves:
