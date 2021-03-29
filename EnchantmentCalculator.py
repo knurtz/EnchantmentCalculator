@@ -30,7 +30,7 @@ class Item(Node):
 		self.prior_work = prior_work
 		self.enchantments = enchantments
 		self.cost = 0
-		self.value = 0
+		#self.value = 0
 		self.name = name
 		self.parent = parent
 		if children:
@@ -38,34 +38,43 @@ class Item(Node):
 	
 	def updateCost(self):
 		# leaves can't update their children, also their prior work and enchantments are fixed and value is calculated differently
-		if not self.is_leaf:
-			self.children[0].updateCost()
-			self.children[1].updateCost()
-						
-			self.enchantments, incomp_penalty = combineEnchantments()
-			self.cost = prior_work_penalty[self.children[0].prior_work] + prior_work_penalty[self.children[1].prior_work] + self.children[1].value + incomp_penalty # + repairing + renaming
-			self.prior_work = 1 + min([max([self.children[0].prior_work, self.children[1].prior_work])], 5)		#  prior work caps at 6, which maps to cost of 100 (i.e. too expensive)
-		
-			self.value = self.children[0].value + self.children[1].value
+		if self.is_leaf:
+			return
 			
-		else:
-			self.value = valueFromEnchantments(self.enchantments)
-			
-		# todo: reasons to break (figure out, how to propagate this break)
-		#  - cost is too expensive
-		#  - target is book, sacrifice is item
-		#  - enchantment marked as keep would get lost
+		self.children[0].updateCost()
+		self.children[1].updateCost()
+					
+		possible, self.enchantments, combination_cost = combineEnchantments()
+		self.cost = prior_work_penalty[self.children[0].prior_work] + prior_work_penalty[self.children[1].prior_work] + combination_cost # + repairing + renaming
+		self.prior_work = min([max([self.children[0].prior_work, self.children[1].prior_work])], 5) + 1		#  prior work caps at 6, which maps to cost of 100 (i.e. too expensive)
 	
-	# Returns the combined enchantments from both children as well as the penalty for incompatible enchantments
+		self.value = self.children[0].value + self.children[1].value
+			
+		# todo: reasons to break (figure out, how to propagate this break in order to )
+		#  - cost is too expensive (>= 40)
+		#  - target is book, sacrifice is item
+		#  - combineEnchantments returns not possible (maybe because an enchantment marked as keep gets lost or no enchantments remain after checking combination and compatibility)
+	
+	# Returns the combined enchantments from both children as well as the resulting cost
 	def combineEnchantments(self):
-		return [], 0
+		ench = self.children[0].enchantments	# all target enchantments are kept
+		cost = 0
+		possible = False
+		lut = self.children[1].item_type == "book" ? book_multiplier_lut : item_multiplier_lut
+		for e in self.children[1].enchantments:
+			# check combining
+			# check compatibility
+			ench.append(e)
+			cost = cost + e.level * lut[e.identifier]
+			possible = True
+		return possible, ench, cost
 		
 	# Returns the value determined by an item's enchantments
-	def valueFromEnchantments(self):
-		value = 0
-		lut = self.item_type == "book" ? book_multiplier_lut : item_multiplier_lut
-		for e in self.enchantments:
-			value = value + e.level * lut[e.identifier]
+	#def valueFromEnchantments(self):
+	#	value = 0
+	#	lut = self.item_type == "book" ? book_multiplier_lut : item_multiplier_lut
+	#	for e in self.enchantments:
+	#		value = value + e.level * lut[e.identifier]
 		
 		
 		
